@@ -7,13 +7,13 @@
 
 const fs = require('fs')
 const path = require('path')
-const version = require('../version').version
+const makeId = require('../libs/make-id')
+const version = require('../version')
 
 module.exports = (work_path, sys_hosts_path) => {
-  try {
+  let is_dir = fs.existsSync(work_path) && fs.lstatSync(work_path).isDirectory()
+  if (!is_dir) {
     fs.mkdirSync(work_path)
-  } catch (e) {
-    console.log(e)
   }
 
   let cnt = fs.readFileSync(sys_hosts_path, 'utf-8')
@@ -21,9 +21,11 @@ module.exports = (work_path, sys_hosts_path) => {
   let data = {
     list: [{
       title: 'My hosts',
+      id: makeId(),
       content: '# My hosts'
     }, {
       title: 'backup',
+      id: makeId(),
       content: cnt
     }],
     version: version

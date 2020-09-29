@@ -1,0 +1,25 @@
+@import "../styles/cfg";
+
+.root {
+  -webkit-app-region: no-drag;
+}
+
+.custom-items {
+  position: fixed;
+  width: 240px;
+  top: 36px;
+  bottom: 30px;
+  overflow: auto;
+
+  .my-scroll();
+}
+
+.sort-bg {
+  background: @sorg-bg-color;
+}
+
+:global(.platform-darwin) {
+  .custom-items {
+    top: 56px;
+  }
+}

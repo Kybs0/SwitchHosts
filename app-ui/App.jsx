@@ -7,14 +7,18 @@
 
 import React from 'react'
 import { notification } from 'antd'
-import Panel from './panel/Panel'
+import classnames from 'classnames'
+import Panel from './Panel'
 import Content from './content/Content'
 import SudoPrompt from './frame/SudoPrompt'
 import EditPrompt from './frame/EditPrompt'
+import StatConfirm from './frame/StatConfirm'
 import About from './about/About'
 import PreferencesPrompt from './frame/PreferencesPrompt'
 import Agent from './Agent'
+import { WHERE_REMOTE, WHERE_GROUP, WHERE_FOLDER } from './configs/contants'
 import { reg as events_reg } from './events/index'
+import treeFunc from '../app/libs/treeFunc'
 
 import './App.less'
 
@@ -27,7 +31,8 @@ export default class App extends React.Component {
       sys_hosts: {}, // 系统 hosts
       current: {}, // 当前 hosts
       lang: {}, // 语言
-      just_added_id: null
+      just_added_id: null,
+      theme: 'light'
     }
 
     this.is_dragging = false
@@ -35,6 +40,9 @@ export default class App extends React.Component {
 
     Agent.pact('getPref')
       .then(pref => {
+        this.setState({theme: pref.theme || 'light'})
+        document.body.className += ' theme-' + pref.theme
+
         return pref.user_language || 'en'
       })
       .then(l => {
@@ -82,46 +90,45 @@ export default class App extends React.Component {
     }, 60 * 1000)
   }
 
-  loadHosts () {
-    Agent.pact('getHosts').then(data => {
-      let state = {
-        list: data.list,
-        sys_hosts: data.sys_hosts
-      }
-      let current = this.state.current
-      state.current = data.list.find(item => item.id === current.id) ||
-        data.sys_hosts
+  async loadHosts (current_id) {
+    let data = await Agent.pact('getHosts')
+    let state = {
+      list: data.list,
+      sys_hosts: data.sys_hosts
+    }
 
-      this.setState(state)
-    })
+    if (!current_id) {
+      current_id = this.state.current.id
+    }
+    state.current = treeFunc.getItemById(data.list, current_id) || data.sys_hosts
+
+    this.setState(state)
   }
 
-  setCurrent (hosts) {
+  async setCurrent (hosts) {
     if (hosts.is_sys) {
-      Agent.pact('getSysHosts')
-        .then(_hosts => {
-          this.setState({
-            sys_hosts: _hosts,
-            current: _hosts
-          })
-        })
-    } else {
+      let _hosts = await Agent.pact('getSysHosts')
       this.setState({
-        current: hosts
+        sys_hosts: _hosts,
+        current: _hosts
       })
+    } else {
+      let {current} = this.state
+      if (current && current.id !== hosts.id) {
+        await this.loadHosts(hosts.id)
+      }
     }
   }
 
   static isReadOnly (hosts) {
-    return !hosts || hosts.is_sys || hosts.where === 'remote' ||
-      hosts.where === 'group'
+    return !hosts || hosts.is_sys || ([WHERE_FOLDER, WHERE_GROUP, WHERE_REMOTE]).includes(hosts.where)
   }
 
   toSave () {
     clearTimeout(this._t)
 
     this._t = setTimeout(() => {
-      Agent.emit('save', this.state.list)
+      Agent.emit('save', this.state.list, null, true)
     }, 1000)
   }
 
@@ -129,10 +136,11 @@ export default class App extends React.Component {
     let {current, list} = this.state
     if (current.content === v) return // not changed
 
-    current = Object.assign({}, current, {
-      content: v || ''
-    })
-    list = list.slice(0)
+    //current = Object.assign({}, current, {
+    //  content: v || ''
+    //})
+    //list = list.slice(0)
+    current.content = v
     let idx = list.findIndex(i => i.id === current.id)
     if (idx !== -1) {
       list.splice(idx, 1, current)
@@ -152,23 +160,44 @@ export default class App extends React.Component {
     })
   }
 
-  componentDidMount () {
+  handleOndragenter (events) {
+    events.preventDefault()
+  }
 
+  handleOndragover (events) {
+    events.preventDefault()
+  }
+
+  handleOndrop (events) {
+    events.preventDefault()
+  }
+
+  componentDidMount () {
     window.addEventListener('keydown', (e) => {
       if (e.keyCode === 27) {
         Agent.emit('esc')
       }
     }, false)
 
-    window.addEventListener('mouseup', () => {
-      Agent.emit('drag_end')
-    })
+    //window.addEventListener('mouseup', () => {
+    //  Agent.emit('drag_end')
+    //})
   }
 
   render () {
-    let current = this.state.current
+    let {current, theme} = this.state
+
     return (
-      <div id="app" className={'platform-' + Agent.platform}>
+      <div
+        className={classnames({
+          //['theme-' + theme]: 1,
+          ['platform-' + Agent.platform]: 1
+        })}
+        onDragEnter={this.handleOndragenter}
+        onDragOver={this.handleOndragover}
+        onDrop={this.handleOndrop}
+      >
+        <StatConfirm lang={this.state.lang}/>
         <SudoPrompt lang={this.state.lang}/>
         <EditPrompt
           lang={this.state.lang}
@@ -186,6 +215,7 @@ export default class App extends React.Component {
           lang={this.state.lang}
           just_added_id={this.state.just_added_id}
           justAdd={this.justAdd.bind(this)}
+          theme={theme}
         />
         <Content
           current={current}

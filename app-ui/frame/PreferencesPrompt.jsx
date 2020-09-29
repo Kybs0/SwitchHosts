@@ -6,12 +6,12 @@
 'use strict'
 
 import React from 'react'
-import R from 'ramda'
-import { Checkbox, Input, Radio, Select, Tabs } from 'antd'
+import lodash from 'lodash'
+import { Checkbox, Row, Col, Radio, Select, Tabs } from 'antd'
 import MyFrame from './MyFrame'
 import classnames from 'classnames'
 import Agent from '../Agent'
-import { version as current_version } from '../../app/version'
+import version from '../../app/version'
 import formatVersion from '../../app/libs/formatVersion'
 import CodeMirror from 'react-codemirror'
 import 'codemirror/mode/shell/shell'
@@ -20,7 +20,11 @@ import './PreferencesPrompt.less'
 const RadioGroup = Radio.Group
 const Option = Select.Option
 const TabPane = Tabs.TabPane
-const pref_keys = ['after_cmd', 'auto_launch', 'choice_mode', 'hide_at_launch', 'is_dock_icon_hidden', 'user_language', 'send_usage_data']
+const pref_keys = [
+  'after_cmd', 'auto_launch', 'choice_mode', 'hide_at_launch', 'is_dock_icon_hidden',
+  'user_language', 'send_usage_data', 'show_title_on_tray', 'theme',
+  'env'
+]
 
 export default class PreferencesPrompt extends React.Component {
   constructor (props) {
@@ -28,7 +32,7 @@ export default class PreferencesPrompt extends React.Component {
 
     this.state = {
       show: false,
-      user_language: '',
+      user_language: 'en',
       after_cmd: '',
       choice_mode: 'multiple',
       auto_launch: false,
@@ -63,7 +67,7 @@ export default class PreferencesPrompt extends React.Component {
     this.setState({
       show: false
     }, () => {
-      let prefs = R.pick(pref_keys, this.state)
+      let prefs = lodash.pick(this.state, pref_keys)
 
       Agent.pact('setPref', prefs)
         .then(() => {
@@ -88,20 +92,8 @@ export default class PreferencesPrompt extends React.Component {
     })
   }
 
-  updateLangKey (v) {
-    this.setState({user_language: v})
-  }
-
-  updateChoiceMode (v) {
-    this.setState({
-      choice_mode: v
-    })
-  }
-
-  updateAfterCmd (v) {
-    this.setState({
-      after_cmd: v
-    })
+  updatePref (obj) {
+    this.setState(obj)
   }
 
   updateAutoLaunch (v) {
@@ -112,28 +104,51 @@ export default class PreferencesPrompt extends React.Component {
     // todo set auto launch
   }
 
-  updateMinimizeAtLaunch (v) {
-    this.setState({
-      hide_at_launch: v
-    })
-  }
-
   prefLanguage () {
     let {lang} = this.props
 
     return (
       <div className="ln">
-        <div>{lang.language}</div>
-        <div className="inform">{lang.should_restart_after_change_language}</div>
-        <div>
-          <Select
-            value={this.state.user_language || ''}
-            onChange={v => this.updateLangKey(v)}
-            style={{minWidth: 120}}
-          >
-            {this.getLanguageOptions()}
-          </Select>
-        </div>
+        <Row gutter={16}>
+          <Col span={7}>
+            <span>{lang.language}</span>
+          </Col>
+          <Col span={17}>
+            <Select
+              value={this.state.user_language}
+              onChange={v => this.updatePref({user_language: v})}
+              style={{minWidth: 120}}
+            >
+              {this.getLanguageOptions()}
+            </Select>
+          </Col>
+        </Row>
+      </div>
+    )
+  }
+
+  prefTheme () {
+    let {lang} = this.props
+    let themes = ['light', 'dark']
+
+    return (
+      <div className="ln">
+        <Row gutter={16}>
+          <Col span={7}>
+            <span>{lang.theme}</span>
+          </Col>
+          <Col span={17}>
+            <Select
+              value={this.state.theme || 'light'}
+              onChange={v => this.updatePref({theme: v})}
+              style={{minWidth: 120}}
+            >
+              {themes.map(t => (
+                <Option value={t} key={t}>{lang['theme_' + t]}</Option>
+              ))}
+            </Select>
+          </Col>
+        </Row>
       </div>
     )
   }
@@ -143,16 +158,20 @@ export default class PreferencesPrompt extends React.Component {
 
     return (
       <div className="ln">
-        <div>{lang.pref_choice_mode}</div>
-        <div>
-          <RadioGroup
-            onChange={e => this.updateChoiceMode(e.target.value)}
-            value={this.state.choice_mode}
-          >
-            <Radio value="single">{lang.pref_choice_mode_single}</Radio>
-            <Radio value="multiple">{lang.pref_choice_mode_multiple}</Radio>
-          </RadioGroup>
-        </div>
+        <Row gutter={16}>
+          <Col span={7}>
+            <span>{lang.pref_choice_mode}</span>
+          </Col>
+          <Col span={17}>
+            <RadioGroup
+              onChange={e => this.updatePref({choice_mode: e.target.value})}
+              value={this.state.choice_mode}
+            >
+              <Radio.Button value="single">{lang.pref_choice_mode_single}</Radio.Button>
+              <Radio.Button value="multiple">{lang.pref_choice_mode_multiple}</Radio.Button>
+            </RadioGroup>
+          </Col>
+        </Row>
       </div>
     )
   }
@@ -169,16 +188,16 @@ export default class PreferencesPrompt extends React.Component {
         <div>
           <div className="inform">{lang.pref_after_cmd_info}</div>
           {/*<Input*/}
-            {/*type="textarea"*/}
-            {/*rows={8}*/}
-            {/*defaultValue={this.state.after_cmd}*/}
-            {/*placeholder={lang.pref_after_cmd_placeholder}*/}
-            {/*onChange={(e) => this.updateAfterCmd(e.target.value)}*/}
+          {/*type="textarea"*/}
+          {/*rows={8}*/}
+          {/*defaultValue={this.state.after_cmd}*/}
+          {/*placeholder={lang.pref_after_cmd_placeholder}*/}
+          {/*onChange={(e) => this.updateAfterCmd(e.target.value)}*/}
           {/*/>*/}
           <CodeMirror
             className="pref-cm"
             value={this.state.after_cmd}
-            onChange={v => this.updateAfterCmd(v)}
+            onChange={v => this.updatePref({after_cmd: v})}
             options={options}
           />
         </div>
@@ -201,6 +220,21 @@ export default class PreferencesPrompt extends React.Component {
     )
   }
 
+  prefShowTitleOnTray () {
+    let {lang} = this.props
+
+    return (
+      <div className="ln">
+        <Checkbox
+          checked={this.state.show_title_on_tray}
+          onChange={(e) => this.updatePref({show_title_on_tray: e.target.checked})}
+        >
+          {lang.show_title_on_tray}
+        </Checkbox>
+      </div>
+    )
+  }
+
   prefMinimizeAtLaunch () {
     let {lang} = this.props
 
@@ -208,7 +242,7 @@ export default class PreferencesPrompt extends React.Component {
       <div className="ln">
         <Checkbox
           checked={this.state.hide_at_launch}
-          onChange={(e) => this.updateMinimizeAtLaunch(e.target.checked)}
+          onChange={(e) => this.updatePref({hide_at_launch: e.target.checked})}
         >
           {lang.hide_at_launch}
         </Checkbox>
@@ -242,6 +276,7 @@ export default class PreferencesPrompt extends React.Component {
   body () {
     let {lang} = this.props
     let height = 240
+    let is_mac = Agent.platform === 'darwin'
 
     return (
       <div ref="body">
@@ -254,24 +289,32 @@ export default class PreferencesPrompt extends React.Component {
           <a
             href="#"
             onClick={PreferencesPrompt.openDownloadPage}
-          >{formatVersion(current_version)}</a>
+          >{formatVersion(version)}</a>
         </div>
         <Tabs
           defaultActiveKey="1"
           tabPosition="left"
           style={{minHeight: height}}
         >
-          <TabPane tab={lang.pref_tab_general} key="1" style={{height}}>
-            {this.prefLanguage()}
-            {this.prefChoiceMode()}
-            {/*{this.prefAutoLaunch()}*/}
-            {this.prefMinimizeAtLaunch()}
+          <TabPane tab={lang.pref_tab_general} key="1">
+            <div style={{minHeight: height}}>
+              {this.prefLanguage()}
+              {this.prefTheme()}
+              {this.prefChoiceMode()}
+              {/*{this.prefAutoLaunch()}*/}
+              {is_mac ? this.prefShowTitleOnTray() : null}
+              {this.prefMinimizeAtLaunch()}
+            </div>
           </TabPane>
-          <TabPane tab={lang.pref_tab_custom_cmd} key="2" style={{height}}>
-            {this.prefAfterCmd()}
+          <TabPane tab={lang.pref_tab_custom_cmd} key="2">
+            <div style={{minHeight: height}}>
+              {this.prefAfterCmd()}
+            </div>
           </TabPane>
-          <TabPane tab={lang.pref_tab_advanced} key="3" style={{height}}>
-            {this.prefAdvanced()}
+          <TabPane tab={lang.pref_tab_advanced} key="3">
+            <div style={{minHeight: height}}>
+              {this.prefAdvanced()}
+            </div>
           </TabPane>
         </Tabs>
       </div>

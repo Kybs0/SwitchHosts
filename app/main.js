@@ -8,13 +8,18 @@
  */
 
 const electron = require('electron')
-const fs = require('fs')
-const app = electron.app
+const path = require('path')
+//const fs = require('fs')
+const {app, dialog} = electron
 const BrowserWindow = electron.BrowserWindow
+const platform = process.platform
 
+const paths = require('./server/paths')
 const pref = require('./server/pref')
+const m_lang = require('./server/lang')
 let user_language = pref.get('user_language') || (app.getLocale() || '').split('-')[0].toLowerCase() || 'en'
 global.user_language = user_language
+global.lang = m_lang.getLang(user_language)
 
 require('./server/Server')
 
@@ -22,6 +27,7 @@ const tray = require('./menu/tray')
 const svr = require('./server/svr')
 const main_menu = require('./menu/main_menu')
 const checkUpdate = require('./server/checkUpdate')
+const windowStateKeeper = require('electron-window-state')
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -32,22 +38,45 @@ let is_tray_initialized
 let renderer
 
 function createWindow () {
+
+  // Load the previous state with fallback to defaults
+  let mainWindowState = windowStateKeeper({
+    defaultWidth: 800,
+    defaultHeight: 480,
+    path: paths.work_path
+  })
+
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 800
-    , height: 500
-    , minWidth: 400
-    , minHeight: 250
-    , fullscreenable: true
-    //, autoHideMenuBar: true
+    width: mainWindowState.width,
+    height: mainWindowState.height,
+    x: mainWindowState.x,
+    y: mainWindowState.y,
+    minWidth: 400,
+    minHeight: 250,
+    fullscreenable: true,
+    icon: path.join(__dirname, 'assets', 'logo@512w.png'),
+    webPreferences: {
+      nodeIntegration: true
+    },
+    autoHideMenuBar: true,
+    titleBarStyle: platform === 'darwin' ? 'hiddenInset' : 'default'
   })
+
+  // Let us register listeners on the window, so we can update the state
+  // automatically (the listeners will be removed when the window is closed)
+  // and restore the maximized or full screen state
+  mainWindowState.manage(mainWindow)
+
   contents = mainWindow.webContents
   app.mainWindow = mainWindow
 
   // and load the index.html of the app.
   mainWindow.loadURL(`file://${__dirname}/ui/index.html?lang=${user_language}`)
 
-  if (process.env && process.env.ENV === 'dev') {
+  if ((process.env && process.env.ENV === 'dev') || pref.get('env') === 'DEV') {
+    //require('devtron').install()
+
     // Open the DevTools.
     mainWindow.webContents.openDevTools()
   }
@@ -89,25 +118,37 @@ function createWindow () {
   svr.win = mainWindow
 }
 
-const should_quit = app.makeSingleInstance((commandLine, workingDirectory) => {
-  // Someone tried to run a second instance, we should focus our window.
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore()
-    }
-    mainWindow.show()
-    // mainWindow.focus();
-  }
-})
-
-if (should_quit) {
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
   app.quit()
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore()
+      }
+      mainWindow.focus()
+    }
+  })
+
+  // Create myWindow, load the rest of the app, etc...
+  app.on('ready', () => {
+  })
 }
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => {
+app.on('ready', async () => {
+  if (global.error) {
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'Error',
+      message: global.error.message
+    })
+    app.exit()
+  }
+
   createWindow()
   main_menu.init(app, user_language)
 

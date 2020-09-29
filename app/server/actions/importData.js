@@ -5,9 +5,10 @@
 
 'use strict'
 
+const {Notification} = require('electron')
 const paths = require('../paths')
 const io = require('../io')
-const version = require('../../version').version
+const version = require('../../version')
 const saveHosts = require('./saveHosts')
 
 module.exports = (svr, fn) => {
@@ -33,6 +34,13 @@ module.exports = (svr, fn) => {
       })
       .then(() => {
         svr.broadcast('reload')
+
+        let notify = new Notification({
+          title: lang.import,
+          body: lang.import_finish
+        })
+
+        notify.show()
       })
       .then(() => resolve())
       .catch(e => reject(e))

@@ -7,8 +7,8 @@
 
 const {ipcMain} = require('electron')
 const actions = require('./actions')
-const app = require('./http/app')
 const svr = require('./svr')
+require('./http/app')
 
 let renderer
 
@@ -27,6 +27,7 @@ ipcMain.on('x', (e, d) => {
         try {
           sender.send(d.callback, [null, v])
         } catch (e) {
+          console.log(`Error: action [${action}] fail!`)
           console.log(e)
         }
       })
